@@ -2,6 +2,7 @@ const { Command } = require('commander');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const xml2js = require('xml2js');
 
 const program = new Command();
 
@@ -14,6 +15,7 @@ program.parse(process.argv);
 const options = program.opts();
 
 const inputFilePath = path.resolve(options.input);
+const builder = new xml2js.Builder();
 
 if (!fs.existsSync(inputFilePath)) {
   console.error("Cannot find input file");
@@ -21,8 +23,29 @@ if (!fs.existsSync(inputFilePath)) {
 }
 
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Server working!\n');
+  try {
+    const jsonData = fs.readFileSync(inputFilePath, 'utf-8');
+    const reserves = JSON.parse(jsonData);
+
+    const minReserve = reserves.reduce((min, current) =>
+      parseFloat(current.value) < parseFloat(min.value) ? current : min
+    );
+
+    const xmlObj = {
+      Reserve: {
+        Name: minReserve.txten,
+        Value: minReserve.value
+      }
+    };
+
+    const xml = builder.buildObject(xmlObj);
+
+    res.writeHead(200, { 'Content-Type': 'application/xml' });
+    res.end(xml);
+  } catch (err) {
+    res.writeHead(500, { 'Content-Type': 'text/plain' });
+    res.end(`Server Error: ${err.message}`);
+  }
 });
 
 server.listen(options.port, options.host, () => {
