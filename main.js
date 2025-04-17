@@ -1,5 +1,5 @@
 const { Command } = require('commander');
-const fs = require('fs');
+const fs = require('fs/promises');
 const http = require('http');
 const path = require('path');
 const xml2js = require('xml2js');
@@ -17,37 +17,50 @@ const options = program.opts();
 const inputFilePath = path.resolve(options.input);
 const builder = new xml2js.Builder();
 
-if (!fs.existsSync(inputFilePath)) {
-  console.error("Cannot find input file");
-  process.exit(1);
+async function fileExists(path) {
+  try {
+    await fs.access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-const server = http.createServer((req, res) => {
-  try {
-    const jsonData = fs.readFileSync(inputFilePath, 'utf-8');
-    const reserves = JSON.parse(jsonData);
-
-    const minReserve = reserves.reduce((min, current) =>
-      parseFloat(current.value) < parseFloat(min.value) ? current : min
-    );
-
-    const xmlObj = {
-      Reserve: {
-        Name: minReserve.txten,
-        Value: minReserve.value
-      }
-    };
-
-    const xml = builder.buildObject(xmlObj);
-
-    res.writeHead(200, { 'Content-Type': 'application/xml' });
-    res.end(xml);
-  } catch (err) {
-    res.writeHead(500, { 'Content-Type': 'text/plain' });
-    res.end(`Server Error: ${err.message}`);
+async function startServer() {
+  if (!(await fileExists(inputFilePath))) {
+    console.error("Cannot find input file");
+    process.exit(1);
   }
-});
 
-server.listen(options.port, options.host, () => {
-  console.log(`Server working on http://${options.host}:${options.port}`);
-});
+  const server = http.createServer(async (req, res) => {
+    try {
+      const jsonData = await fs.readFile(inputFilePath, 'utf-8');
+      const reserves = JSON.parse(jsonData);
+
+      const minReserve = reserves.reduce((min, current) =>
+        parseFloat(current.value) < parseFloat(min.value) ? current : min
+      );
+
+      const xmlObj = {
+        Reserve: {
+          Name: minReserve.txten,
+          Value: minReserve.value
+        }
+      };
+
+      const xml = builder.buildObject(xmlObj);
+
+      res.writeHead(200, { 'Content-Type': 'application/xml' });
+      res.end(xml);
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end(`Server Error: ${err.message}`);
+    }
+  });
+
+  server.listen(options.port, options.host, () => {
+    console.log(`Server working on http://${options.host}:${options.port}`);
+  });
+}
+
+startServer();
