@@ -42,9 +42,8 @@ async function startServer() {
       );
 
       const xmlObj = {
-        Reserve: {
-          Name: minReserve.txten,
-          Value: minReserve.value
+        data: {
+          min_value: minReserve.value
         }
       };
 
