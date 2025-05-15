@@ -38,7 +38,7 @@ async function startServer() {
       const reserves = JSON.parse(jsonData);
 
       const minReserve = reserves.reduce((min, current) =>
-        parseFloat(current.value) < parseFloat(min.value) ? current : min
+        current.value < min.value ? current : min
       );
 
       const xmlObj = {
